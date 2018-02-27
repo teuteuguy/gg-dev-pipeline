@@ -7,7 +7,7 @@ phases:
       - wget https://github.com/stedolan/jq/releases/download/jq-1.5/jq-linux64
       - chmod +x jq-linux64
       - mv jq-linux64 /usr/bin/jq
-      - INSTANCE_ID=$(aws describe-instance-information --region $AWS_REGION --query "InstanceInformationList[?ActivationId==\`$SSM_ACTIVATION_ID\`].InstanceId" --output text)
+      - INSTANCE_ID=$(aws ssm describe-instance-information --region $AWS_REGION --query "InstanceInformationList[?ActivationId==\`$SSM_ACTIVATION_ID\`].InstanceId" --output text)
       # - INSTANCE_ID=$(aws ssm describe-instance-information --region $AWS_REGION --query "InstanceInformationList[?Name==\`$\`].InstanceId" --output text)
       # - INSTANCE_TAGS=`aws resourcegroupstaggingapi get-resources --region $AWS_REGION --tag-filters "Key=gg-dev-pipeline,Values=$PIPELINE_NAME" "Key=type,Values=ManagedInstance" --query ResourceTagMappingList[0]`
       # - echo $INSTANCE_TAGS
