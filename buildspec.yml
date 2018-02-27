@@ -16,7 +16,7 @@ phases:
   build:
     commands:
       - echo Running the build on the SSM managed device
-      - SSM_COMMAND_ID=`aws ssm send-command --region $AWS_REGION --instance-ids $INSTANCE_ID --document-name "$SSM_DOCUMENT" --parameters gitRepositoryURL="$GITHUB_REPO_URL",iotCredentialEndpoint="$IOT_CREDENTIAL_ENDPOINT",ggGroupName="$GG_GROUP_NAME",devPipelineName="$DEV_PIPELINE_NAME" --query Command.CommandId --output text`
+      - SSM_COMMAND_ID=`aws ssm send-command --region $AWS_REGION --instance-ids $INSTANCE_ID --document-name "$SSM_DOCUMENT" --parameters gitRepositoryURL="$GITHUB_REPO_URL",iotCredentialEndpoint="$IOT_CREDENTIAL_ENDPOINT",ggGroupName="$GG_GROUP_NAME",devPipelineName="$PIPELINE_NAME" --query Command.CommandId --output text`
       - echo $SSM_COMMAND_ID
       - SSM_COMMAND_DONE=false
       - for i in `seq 1 20`; do SSM_STATUS=`aws ssm get-command-invocation --instance-id "$INSTANCE_ID" --command-id $SSM_COMMAND_ID --region $AWS_REGION --query Status --output text`; echo $SSM_COMMAND_ID $SSM_STATUS $i; case $SSM_STATUS in Pending|InProgress|Delayed) echo "WAITING"; sleep 5 ;; *) echo "DONE"; SSM_COMMAND_DONE=true; break ;; esac done

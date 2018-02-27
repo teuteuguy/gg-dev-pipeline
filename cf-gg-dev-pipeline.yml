@@ -44,7 +44,6 @@ Resources:
             description: (Required) The GG Group Name
           devPipelineName:
             type: String
-            default: !Ref 'AWS::StackName'
             description: Name of the dev pipeline name
         runtimeConfig:
           'aws:runShellScript':
