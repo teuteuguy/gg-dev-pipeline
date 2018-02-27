@@ -151,11 +151,12 @@ Resources:
           - Effect: Allow
             Resource: '*'
             Action:
-              - 'tag:GetResources'
-              - 'codepipeline:GetPipeline'
+              - 'ssm:DescribeInstanceInformation'
               - 'iot:DescribeEndpoint'
               - 'ssm:SendCommand'
               - 'ssm:GetCommandInvocation'
+              # - 'tag:GetResources'
+              # - 'codepipeline:GetPipeline'
       Roles:
         - !Ref CodeBuildRole
   CodeBuild:
