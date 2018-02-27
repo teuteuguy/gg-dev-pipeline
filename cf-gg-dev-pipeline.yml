@@ -155,8 +155,6 @@ Resources:
               - 'iot:DescribeEndpoint'
               - 'ssm:SendCommand'
               - 'ssm:GetCommandInvocation'
-              # - 'tag:GetResources'
-              # - 'codepipeline:GetPipeline'
       Roles:
         - !Ref CodeBuildRole
   CodeBuild:
@@ -182,7 +180,8 @@ Resources:
           - Name: GG_GROUP_NAME
             Value: !Ref GGGroupName
           - Name: SSM_ACTIVATION_ID
-            Value: 'Fn::ImportValue !Sub ''${CFCommonStackName}-SSMActivationId'''
+            Value: !ImportValue 
+              'Fn::Sub': '${CFCommonStackName}-SSMActivationId'
       Name: !Sub '${AWS::StackName}-CodeBuild'
       ServiceRole: !Ref CodeBuildRole
       Source:

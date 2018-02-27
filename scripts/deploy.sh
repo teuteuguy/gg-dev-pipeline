@@ -1,8 +1,8 @@
 #!/bin/bash
 
-# set -e
+set -e
 
-# echo Post Install Script
+echo Post Install Script
 
 # echo DEV_PIPELINE_NAME: $DEV_PIPELINE_NAME
 
