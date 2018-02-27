@@ -2,6 +2,10 @@
 
 This is Work In Progress lambda function for my Greengrass that implements the dev-pipeline concept.
 
+TODO:
+- Fix the github links to the deploy stacks....
+- See if we can provision the lambda function on the greengrass group directly at CF time?
+
 ## Start by setting up the COMMON resources.
 
 Deploy the following common AWS CloudFormation template, and give it a name: for example: ***[gg-dev-pipeline-common]***
