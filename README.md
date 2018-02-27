@@ -1,33 +1,33 @@
-# gg-donkey-drive
+# gg-dev-pipeline boylerplate
 
 This is Work In Progress lambda function for my Greengrass that implements the dev-pipeline concept.
 
-## Pre-requisites (sorry there are many for now)
+## Start by setting up the COMMON resources.
 
-TODO:
-- Check the buildspec to get the repo from the env vars instead of re-calculating it.
-- Check that we are using the CF name everywhere instead of the pipeline name
+Setup the cf-common.yml CloudFormation template.
 
-### Start by setting up the COMMON resources.
-cf-common.yml CloudFormation template
-Give it a name: ex: gg-dev-pipeline-common 
+Give it a name, for example: ***[gg-dev-pipeline-common]***
 
-Manual steps you need to run after the common template:
+**Manual steps** you need to run after the common template:
+
 1. Get the ActivationId and ActivationCode from the Outputs of the Common Cloudformation script
 2. Then, on your device (example: Raspberry Pi), install and configure SSM agent.
 
-mkdir /tmp/ssm
-sudo curl https://s3.amazonaws.com/ec2-downloads-windows/SSMAgent/latest/debian_arm/amazon-ssm-agent.deb -o /tmp/ssm/amazon-ssm-agent.deb
-sudo dpkg -i /tmp/ssm/amazon-ssm-agent.deb
-sudo service amazon-ssm-agent stop
-sudo amazon-ssm-agent -register -code "[ActivationCode]" -id "[ActivationId]" –region "[AWS Region where you ran the Cloudformation script]"
-sudo service amazon-ssm-agent start
+		mkdir /tmp/ssm
+		sudo curl https://s3.amazonaws.com/ec2-downloads-windows/SSMAgent/latest/debian_arm/amazon-ssm-agent.deb -o /tmp/ssm/amazon-ssm-agent.deb
+		sudo dpkg -i /tmp/ssm/amazon-ssm-agent.deb
+		sudo service amazon-ssm-agent stop
+		sudo amazon-ssm-agent -register -code "[ActivationCode]" -id "[ActivationId]" –region "[AWS Region where you ran the Cloudformation script]"
+		sudo service amazon-ssm-agent start
 
-Note: you will need the AWS Cli to be installed on your device. If you are logged into your device, you can install the cli:
-curl "https://s3.amazonaws.com/aws-cli/awscli-bundle.zip" -o "/tmp/awscli-bundle.zip"
-unzip awscli-bundle.zip
-sudo ./awscli-bundle/install -i /usr/local/aws -b /usr/local/bin/aws
+3. You will require the AWS CLI
 
+		curl "https://s3.amazonaws.com/aws-cli/awscli-bundle.zip" -o "/tmp/awscli-bundle.zip"
+		unzip awscli-bundle.zip
+		sudo ./awscli-bundle/install -i /usr/local/aws -b /usr/local/bin/aws
+
+4. Setup and Install Greengrass on your device (with GG Core certificates etc ...)
+5. ****
 
 ### Then setup the custom resources for the given dev function you are working on
 cf-gg-dev-pipeline.yml CloudFormation template

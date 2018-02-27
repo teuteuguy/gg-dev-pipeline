@@ -1,10 +1,5 @@
 AWSTemplateFormatVersion: 2010-09-09
-
 Resources:
-
-  # -----------------------------------
-  # Create IoT Credentials Role Alias
-  # 
   IoTAuthorizedDirectCallsRole:
     Type: 'AWS::IAM::Role'
     Properties:
@@ -21,12 +16,11 @@ Resources:
         - 'arn:aws:iam::aws:policy/AWSLambdaFullAccess'
         - 'arn:aws:iam::aws:policy/ResourceGroupsandTagEditorReadOnlyAccess'
         - 'arn:aws:iam::aws:policy/AWSGreengrassFullAccess'
-
   CustomResourceIoTRoleAliasExecutionRole:
-    Type: AWS::IAM::Role
+    Type: 'AWS::IAM::Role'
     Properties:
       AssumeRolePolicyDocument:
-        Version: '2012-10-17'
+        Version: 2012-10-17
         Statement:
           - Effect: Allow
             Principal:
@@ -34,38 +28,38 @@ Resources:
                 - lambda.amazonaws.com
                 - iot.amazonaws.com
             Action:
-              - sts:AssumeRole
-      Path: "/"
+              - 'sts:AssumeRole'
+      Path: /
       Policies:
         - PolicyName: root
           PolicyDocument:
-            Version: '2012-10-17'
+            Version: 2012-10-17
             Statement:
               - Effect: Allow
                 Action:
-                  - logs:CreateLogGroup
-                  - logs:CreateLogStream
-                  - logs:PutLogEvents
-                Resource: arn:aws:logs:*:*:*
+                  - 'logs:CreateLogGroup'
+                  - 'logs:CreateLogStream'
+                  - 'logs:PutLogEvents'
+                Resource: 'arn:aws:logs:*:*:*'
               - Effect: Allow
                 Action:
-                  - iot:*
-                  - iam:GetRole
-                  - iam:PassRole
-                Resource: "*"
+                  - 'iot:*'
+                  - 'iam:GetRole'
+                  - 'iam:PassRole'
+                Resource: '*'
   CustomResourceIoTRoleAliasFunction:
-    Type: AWS::Lambda::Function
+    Type: 'AWS::Lambda::Function'
     Properties:
-      Handler: "index.handler"
-      Role: { "Fn::GetAtt": [ "CustomResourceIoTRoleAliasExecutionRole", "Arn" ] }
-      Timeout: "25"
-      Runtime: "nodejs6.10"
+      Handler: index.handler
+      Role: !GetAtt 
+        - CustomResourceIoTRoleAliasExecutionRole
+        - Arn
+      Timeout: '25'
+      Runtime: nodejs6.10
       Code:
         ZipFile: >
-          var response = require('cfn-response');
-          var AWS = require('aws-sdk');
-          var iot = new AWS.Iot();
-          var ssm = new AWS.SSM();
+          var response = require('cfn-response'); var AWS = require('aws-sdk');
+          var iot = new AWS.Iot(); var ssm = new AWS.SSM();
 
           exports.handler = function(event, context) {
             console.log("Event:", JSON.stringify(event, null, 2));
@@ -110,16 +104,14 @@ Resources:
             }
           };
   CreateCustomIoTResources:
-    Type: Custom::CreateCustomIoTResources
+    Type: 'Custom::CreateCustomIoTResources'
     Properties:
-      ServiceToken: !GetAtt CustomResourceIoTRoleAliasFunction.Arn
-      roleArn: { "Fn::GetAtt": [ "IoTAuthorizedDirectCallsRole", "Arn" ] }
-  # 
-  # -----------------------------------
-
-  # -----------------------------------
-  # Create SSM Activation and Document
-  #
+      ServiceToken: !GetAtt 
+        - CustomResourceIoTRoleAliasFunction
+        - Arn
+      roleArn: !GetAtt 
+        - IoTAuthorizedDirectCallsRole
+        - Arn
   SSMManagedInstancesRole:
     Type: 'AWS::IAM::Role'
     Properties:
@@ -134,12 +126,11 @@ Resources:
       Path: /
       ManagedPolicyArns:
         - 'arn:aws:iam::aws:policy/service-role/AmazonEC2RoleforSSM'
-
   CustomResourceSSMExecutionRole:
-    Type: AWS::IAM::Role
+    Type: 'AWS::IAM::Role'
     Properties:
       AssumeRolePolicyDocument:
-        Version: '2012-10-17'
+        Version: 2012-10-17
         Statement:
           - Effect: Allow
             Principal:
@@ -148,39 +139,40 @@ Resources:
                 - ssm.amazonaws.com
                 - cloudformation.amazonaws.com
             Action:
-              - sts:AssumeRole
-      Path: "/"
+              - 'sts:AssumeRole'
+      Path: /
       Policies:
         - PolicyName: root
           PolicyDocument:
-            Version: '2012-10-17'
+            Version: 2012-10-17
             Statement:
               - Effect: Allow
                 Action:
-                  - logs:CreateLogGroup
-                  - logs:CreateLogStream
-                  - logs:PutLogEvents
-                Resource: arn:aws:logs:*:*:*
+                  - 'logs:CreateLogGroup'
+                  - 'logs:CreateLogStream'
+                  - 'logs:PutLogEvents'
+                Resource: 'arn:aws:logs:*:*:*'
               - Effect: Allow
                 Action:
-                  - ssm:*
-                  - cloudformation:*
-                  - iam:GetRole
-                  - iam:PassRole
-                Resource: "*"
+                  - 'ssm:*'
+                  - 'cloudformation:*'
+                  - 'iam:GetRole'
+                  - 'iam:PassRole'
+                Resource: '*'
   CustomResourceSSMFunction:
-    Type: AWS::Lambda::Function
+    Type: 'AWS::Lambda::Function'
     Properties:
-      Handler: "index.handler"
-      Role: { "Fn::GetAtt": [ "CustomResourceSSMExecutionRole", "Arn" ] }
-      Timeout: "25"
-      Runtime: "nodejs6.10"
+      Handler: index.handler
+      Role: !GetAtt 
+        - CustomResourceSSMExecutionRole
+        - Arn
+      Timeout: '25'
+      Runtime: nodejs6.10
       Code:
         ZipFile: >
-          var response = require('cfn-response');
-          var AWS = require('aws-sdk');
-          var cloudformation = new AWS.CloudFormation();
-          var ssm = new AWS.SSM();
+          var response = require('cfn-response'); var AWS = require('aws-sdk');
+          var cloudformation = new AWS.CloudFormation(); var ssm = new
+          AWS.SSM();
 
           exports.handler = function(event, context) {
             console.log("Event:", JSON.stringify(event, null, 2));
@@ -190,7 +182,8 @@ Resources:
                 var ssmParams = {
                   IamRole: event.ResourceProperties.IamRole,
                   DefaultInstanceName: 'ggDPManagedInstance',
-                  RegistrationLimit: 1
+                  RegistrationLimit: 1,
+                  Description: 'Greengrass Dev Pipeline SSM Activation'
                 };
                 ssm.createActivation(ssmParams, function(err, responseData) {
                   if (err) {
@@ -253,19 +246,23 @@ Resources:
             }
           };
   CreateCustomSSMResources:
-    Type: Custom::CreateCustomSSMResources
+    Type: 'Custom::CreateCustomSSMResources'
     Properties:
-      ServiceToken: !GetAtt CustomResourceSSMFunction.Arn
+      ServiceToken: !GetAtt 
+        - CustomResourceSSMFunction
+        - Arn
       IamRole: !Ref SSMManagedInstancesRole
-      StackName: !Ref AWS::StackName
-  #
-  # -----------------------------------
-
-
+      StackName: !Ref 'AWS::StackName'
 Outputs:
   SSMActivationId:
     Description: SSM Activation ID
-    Value: { "Fn::GetAtt": [ "CreateCustomSSMResources", "ActivationId" ] }
+    Value: !GetAtt 
+      - CreateCustomSSMResources
+      - ActivationId
+    Export:
+      Name: !Sub '${AWS::StackName}-SSMActivationId'
   SSMActivationCode:
     Description: SSM Activation Code
-    Value: { "Fn::GetAtt": [ "CreateCustomSSMResources", "ActivationCode" ] }
+    Value: !GetAtt 
+      - CreateCustomSSMResources
+      - ActivationCode

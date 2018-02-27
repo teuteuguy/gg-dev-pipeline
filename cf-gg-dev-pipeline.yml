@@ -1,14 +1,18 @@
 AWSTemplateFormatVersion: 2010-09-09
 Description: Helper CloudFormation to create the dev-pipeline
 Parameters:
+  CFCommonStackName:
+    Description: Cloudformation Stack name for the common setup
+    Type: String
+    Default: gg-dev-pipeline-common
   GitHubOwner:
     Description: GitHub account username.
     Type: String
     Default: teuteuguy
   GitHubRepo:
-    Description: Github repository.
+    Description: Just the Github repository name.
     Type: String
-    Default: https://github.com/teuteuguy/gg-dev-pipeline
+    Default: gg-dev-pipeline
   GitHubBranch:
     Description: The branch that will trigger build/deploy.
     Type: String
@@ -17,109 +21,96 @@ Parameters:
     Description: OAuth or personal access token.
     Type: String
     NoEcho: true
+  GGGroupName:
+    Description: Greengrass Group Name for this dev pipeline function
+    Type: String
+    Default: APACDonkeyCar
 Resources:
-
-  # -----------------------------------
-  # Create the SSM document
-  #
-  GGDevPipelineSSMDocument: 
-    Type: "AWS::SSM::Document"
-    Properties: 
-      Content: 
-        schemaVersion: "1.2"
-        description: "SSM Document that clones a github repo, and makes it"
+  GGDevPipelineSSMDocument:
+    Type: 'AWS::SSM::Document'
+    Properties:
+      Content:
+        schemaVersion: '1.2'
+        description: 'SSM Document that clones a github repo, and makes it'
         parameters:
           gitRepositoryURL:
-            type: "String"
-            description: "(Required) The github PUBLIC repo that will be used."        
+            type: String
+            description: (Required) The github PUBLIC repo that will be used.
           iotCredentialEndpoint:
-            type: "String"
-            description: "(Required) Your account's AWS IOT get credentials endpoint."
+            type: String
+            description: (Required) Your account AWS IOT get credentials endpoint.
           ggGroupName:
-            type: "String"
-            description: "(Required) The GG Group Name"
+            type: String
+            description: (Required) The GG Group Name
           devPipelineName:
-            type: "String"
-            default: !Ref AWS::StackName
-            description: "Name of the dev pipeline name"
+            type: String
+            default: !Ref 'AWS::StackName'
+            description: Name of the dev pipeline name
         runtimeConfig:
-          aws:runShellScript:
+          'aws:runShellScript':
             properties:
-              -
-                id: "0.aws:runShellScript"
+              - id: '0.aws:runShellScript'
                 runCommand:
-                  - "#!/bin/bash"
-                  - "set -e"
-                  - "rm -rf /tmp/repo"
-                  - "git clone {{ gitRepositoryURL }} /tmp/repo"
-                  - "cd /tmp/repo"
-                  - "export IOT_CREDENTIAL_ENDPOINT={{ iotCredentialEndpoint }}"
-                  - "export IOT_GG_GROUP_NAME={{ ggGroupName }}"
-                  - "export DEV_PIPELINE_NAME={{ devPipelineName }}"
-                  - "make"
-  #
-  # -----------------------------------
-
-  # -----------------------------------
-  # Create Dummy GG Lambda function
-  # 
+                  - '#!/bin/bash'
+                  - set -e
+                  - rm -rf /tmp/repo
+                  - 'git clone {{ gitRepositoryURL }} /tmp/repo'
+                  - cd /tmp/repo
+                  - 'export IOT_CREDENTIAL_ENDPOINT={{ iotCredentialEndpoint }}'
+                  - 'export IOT_GG_GROUP_NAME={{ ggGroupName }}'
+                  - 'export DEV_PIPELINE_NAME={{ devPipelineName }}'
+                  - make
   GGDevPipelineFunctionExecutionRole:
-    Type: AWS::IAM::Role
+    Type: 'AWS::IAM::Role'
     Properties:
       AssumeRolePolicyDocument:
-        Version: '2012-10-17'
+        Version: 2012-10-17
         Statement:
           - Effect: Allow
             Principal:
               Service:
                 - lambda.amazonaws.com
             Action:
-              - sts:AssumeRole
-      Path: "/"
+              - 'sts:AssumeRole'
+      Path: /
   GGDevPipelineFunction:
-    Type: AWS::Lambda::Function
+    Type: 'AWS::Lambda::Function'
     Properties:
-      Handler: "index.handler"
-      Role: { "Fn::GetAtt": [ "GGDevPipelineFunctionExecutionRole", "Arn" ] }
-      Timeout: "25"
-      Runtime: "nodejs6.10"
+      Handler: index.handler
+      Role: !GetAtt 
+        - GGDevPipelineFunctionExecutionRole
+        - Arn
+      Timeout: '25'
+      Runtime: nodejs6.10
       Tags:
-        -
-          Key: "gg-dev-pipeline"
-          Value: !Ref AWS::StackName
-        -
-          Key: "type"
-          Value: "lambda"
+        - Key: gg-dev-pipeline
+          Value: !Ref 'AWS::StackName'
+        - Key: type
+          Value: lambda
       Code:
-        ZipFile: >
+        ZipFile: |
           exports.handler = function(event, context, callback) {
             console.log("Event:", JSON.stringify(event, null, 2));
             callback(null, "Hello world!");
           };
-  GGDevPipelineFunctionFirstVersion: 
-    Type: "AWS::Lambda::Version"
-    Properties: 
+  GGDevPipelineFunctionFirstVersion:
+    Type: 'AWS::Lambda::Version'
+    Properties:
       FunctionName: !Ref GGDevPipelineFunction
-      Description: "This is the first published version of my function"
+      Description: This is the first published version of my function
   Alias:
     Type: 'AWS::Lambda::Alias'
     Properties:
       FunctionName: !Ref GGDevPipelineFunction
-      FunctionVersion: !GetAtt GGDevPipelineFunctionFirstVersion.Version
+      FunctionVersion: !GetAtt 
+        - GGDevPipelineFunctionFirstVersion
+        - Version
       Name: gg-dev-pipeline
-  # 
-  # -----------------------------------
-
-
-  # -----------------------------------
-  # Create Code Pipeline
-  # 
   ArtifactBucket:
     Type: 'AWS::S3::Bucket'
-    DeletionPolicy: Delete
+    DeletionPolicy: Retain
     Properties:
       AccessControl: Private
-
   CodeBuildRole:
     Type: 'AWS::IAM::Role'
     Properties:
@@ -139,13 +130,27 @@ Resources:
       PolicyDocument:
         Statement:
           - Effect: Allow
-            Resource:
-              - !Sub >-
-                arn:aws:logs:${AWS::Region}:${AWS::AccountId}:log-group:/aws/codebuild/*
+            Resource: !Sub >-
+              arn:aws:logs:${AWS::Region}:${AWS::AccountId}:log-group:/aws/codebuild/*
             Action:
               - 'logs:CreateLogGroup'
               - 'logs:CreateLogStream'
               - 'logs:PutLogEvents'
+          - Effect: Allow
+            Resource:
+              - !Sub 'arn:aws:s3:::${ArtifactBucket}'
+              - !Sub 'arn:aws:s3:::${ArtifactBucket}/*'
+            Action:
+              - 's3:PutObject'
+              - 's3:GetObject'
+              - 's3:GetObjectVersion'
+          - Effect: Allow
+            Resource: !Sub 'arn:aws:ssm:${AWS::Region}:${AWS::AccountId}:parameter/CodeBuild/*'
+            Action:
+              - 'ssm:GetParameters'
+          - Effect: Allow
+            Resource: '*'
+            Action:
               - 'tag:GetResources'
               - 'codepipeline:GetPipeline'
               - 'iot:DescribeEndpoint'
@@ -164,9 +169,19 @@ Resources:
         Type: LINUX_CONTAINER
         EnvironmentVariables:
           - Name: GITHUB_REPO_URL
-            Value: !Ref GitHubRepo
+            Value: !Join 
+              - /
+              - - 'https://github.com'
+                - !Ref GitHubOwner
+                - !Ref GitHubRepo
           - Name: SSM_DOCUMENT
             Value: !Ref GGDevPipelineSSMDocument
+          - Name: PIPELINE_NAME
+            Value: !Ref 'AWS::StackName'
+          - Name: GG_GROUP_NAME
+            Value: !Ref GGGroupName
+          - Name: SSM_ACTIVATION_ID
+            Value: 'Fn::ImportValue !Sub ''${CFCommonStackName}-SSMActivationId'''
       Name: !Sub '${AWS::StackName}-CodeBuild'
       ServiceRole: !Ref CodeBuildRole
       Source:
@@ -212,11 +227,10 @@ Resources:
             Effect: Allow
       Roles:
         - !Ref CodePipelineRole
-
   CodePipeline:
     Type: 'AWS::CodePipeline::Pipeline'
     Properties:
-      Name: !Ref AWS::StackName
+      Name: !Ref 'AWS::StackName'
       RoleArn: !GetAtt 
         - CodePipelineRole
         - Arn
@@ -234,7 +248,7 @@ Resources:
               Configuration:
                 Owner: !Ref GitHubOwner
                 Repo: !Ref GitHubRepo
-                Branch: !Ref GitHubProdBranch
+                Branch: !Ref GitHubBranch
                 OAuthToken: !Ref GitHubOAuthToken
               RunOrder: 1
         - Name: Build
@@ -252,11 +266,6 @@ Resources:
               Configuration:
                 ProjectName: !Ref CodeBuild
               RunOrder: 1
-     ArtifactStore:
-       Type: S3
-       Location: !Ref ArtifactBucket
-  # 
-  # -----------------------------------
-
-
-
+      ArtifactStore:
+        Type: S3
+        Location: !Ref ArtifactBucket
