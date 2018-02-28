@@ -4,7 +4,7 @@ This is **Work In Progress** Devops pipeline building for Greengrass Lambda func
 
 TODO:
 
-* Fix the github links to the deploy stacks....
+* Fix the CF script templateURL links in the README to point to final S3 bucket...
 * See if we can provision the lambda function on the greengrass group directly at CF time?
 
 ## Start by setting up the COMMON resources.
