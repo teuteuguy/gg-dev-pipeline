@@ -1,10 +1,11 @@
 # gg-dev-pipeline boylerplate
 
-This is Work In Progress lambda function for my Greengrass that implements the dev-pipeline concept.
+This is **Work In Progress** Devops pipeline building for Greengrass Lambda function development.
 
 TODO:
-- Fix the github links to the deploy stacks....
-- See if we can provision the lambda function on the greengrass group directly at CF time?
+
+* Fix the github links to the deploy stacks....
+* See if we can provision the lambda function on the greengrass group directly at CF time?
 
 ## Start by setting up the COMMON resources.
 
@@ -12,14 +13,14 @@ Deploy the following common AWS CloudFormation template, and give it a name: for
 
 Region | Launch Template
 ------------ | -------------
-**N. Virginia** (us-east-1) | [![Launch Common Stack into N. Virginia with CloudFormation](/images/deploy-to-aws.png)](https://console.aws.amazon.com/cloudformation/home?region=us-east-1#/stacks/new?stackName=gg-dev-pipeline-common&templateURL=https://raw.githubusercontent.com/teuteuguy/gg-dev-pipeline/master/cf-common.yml)
-**Oregon** (us-west-2) | [![Launch Common Stack into Oregon with CloudFormation](/images/deploy-to-aws.png)](https://console.aws.amazon.com/cloudformation/home?region=us-west-2#/stacks/new?stackName=gg-dev-pipeline-common&templateURL=https://raw.githubusercontent.com/teuteuguy/gg-dev-pipeline/master/cf-common.yml)
-**Frankfurt** (eu-central-1) | [![Launch Common Stack into Frankfurt with CloudFormation](/images/deploy-to-aws.png)](https://console.aws.amazon.com/cloudformation/home?region=eu-central-1#/stacks/new?stackName=gg-dev-pipeline-common&templateURL=https://raw.githubusercontent.com/teuteuguy/gg-dev-pipeline/master/cf-common.yml)
-**Sydney** (ap-southeast-2) | [![Launch Common Stack into Sydney with CloudFormation](/images/deploy-to-aws.png)](https://console.aws.amazon.com/cloudformation/home?region=ap-southeast-2#/stacks/new?stackName=gg-dev-pipeline-common&templateURL=https://raw.githubusercontent.com/teuteuguy/gg-dev-pipeline/master/cf-common.yml)
-**Tokyo** (ap-northeast-1) | [![Launch Common Stack into Tokyo with CloudFormation](/images/deploy-to-aws.png)](https://console.aws.amazon.com/cloudformation/home?region=ap-northeast-1#/stacks/new?stackName=gg-dev-pipeline-common&templateURL=https://raw.githubusercontent.com/teuteuguy/gg-dev-pipeline/master/cf-common.yml)
+**N. Virginia** (us-east-1) | [![Launch Common Stack into N. Virginia with CloudFormation](/images/deploy-to-aws.png)](https://console.aws.amazon.com/cloudformation/home?region=us-east-1#/stacks/new?stackName=gg-dev-pipeline-common&templateURL=)
+**Oregon** (us-west-2) | [![Launch Common Stack into Oregon with CloudFormation](/images/deploy-to-aws.png)](https://console.aws.amazon.com/cloudformation/home?region=us-west-2#/stacks/new?stackName=gg-dev-pipeline-common&templateURL=)
+**Frankfurt** (eu-central-1) | [![Launch Common Stack into Frankfurt with CloudFormation](/images/deploy-to-aws.png)](https://console.aws.amazon.com/cloudformation/home?region=eu-central-1#/stacks/new?stackName=gg-dev-pipeline-common&templateURL=)
+**Sydney** (ap-southeast-2) | [![Launch Common Stack into Sydney with CloudFormation](/images/deploy-to-aws.png)](https://console.aws.amazon.com/cloudformation/home?region=ap-southeast-2#/stacks/new?stackName=gg-dev-pipeline-common&templateURL=)
+**Tokyo** (ap-northeast-1) | [![Launch Common Stack into Tokyo with CloudFormation](/images/deploy-to-aws.png)](https://console.aws.amazon.com/cloudformation/home?region=ap-northeast-1#/stacks/new?stackName=gg-dev-pipeline-common&templateURL=)
 
 
-## **Manual steps** you need to run after the common template:
+### **Manual steps** you need to run after the common template:
 
 1. Get the ActivationId and ActivationCode from the Outputs of the Common Cloudformation script
 2. Then, on your device (example: Raspberry Pi), install and configure SSM agent.
@@ -38,19 +39,27 @@ Region | Launch Template
 		sudo ./awscli-bundle/install -i /usr/local/aws -b /usr/local/bin/aws
 
 4. Setup and Install Greengrass on your device (with GG Core certificates etc ...)
-5. ****
+5. 
 
-## Then setup the custom resources for the given dev function you are working on
+## Setup the CUSTOM resources for the given dev function you are working on
 
 Deploy the following common AWS CloudFormation template, and give it a name: for example: ***[gg-dev-pipeline-common]***
 
 Region | Launch Template
 ------------ | -------------
-**N. Virginia** (us-east-1) | [![Launch Custom dev function Stack into N. Virginia with CloudFormation](/images/deploy-to-aws.png)](https://console.aws.amazon.com/cloudformation/home?region=us-east-1#/stacks/new?stackName=gg-dev-pipeline-test&templateURL=https://raw.githubusercontent.com/teuteuguy/gg-dev-pipeline/master/cf-gg-dev-pipeline.yml)
-**Oregon** (us-west-2) | [![Launch Custom dev function  Stack into Oregon with CloudFormation](/images/deploy-to-aws.png)](https://console.aws.amazon.com/cloudformation/home?region=us-west-2#/stacks/new?stackName=gg-dev-pipeline-test&templateURL=https://raw.githubusercontent.com/teuteuguy/gg-dev-pipeline/master/cf-gg-dev-pipeline.yml)
-**Frankfurt** (eu-central-1) | [![Launch Custom dev function Stack into Frankfurt with CloudFormation](/images/deploy-to-aws.png)](https://console.aws.amazon.com/cloudformation/home?region=eu-central-1#/stacks/new?stackName=gg-dev-pipeline-test&templateURL=https://raw.githubusercontent.com/teuteuguy/gg-dev-pipeline/master/cf-gg-dev-pipeline.yml)
-**Sydney** (ap-southeast-2) | [![Launch Custom dev function Stack into Sydney with CloudFormation](/images/deploy-to-aws.png)](https://console.aws.amazon.com/cloudformation/home?region=ap-southeast-2#/stacks/new?stackName=gg-dev-pipeline-test&templateURL=https://raw.githubusercontent.com/teuteuguy/gg-dev-pipeline/master/cf-gg-dev-pipeline.yml)
-**Tokyo** (ap-northeast-1) | [![Launch Custom dev function Stack into Tokyo with CloudFormation](/images/deploy-to-aws.png)](https://console.aws.amazon.com/cloudformation/home?region=ap-northeast-1#/stacks/new?stackName=gg-dev-pipeline-test&templateURL=https://raw.githubusercontent.com/teuteuguy/gg-dev-pipeline/master/cf-gg-dev-pipeline.yml)
+**N. Virginia** (us-east-1) | [![Launch Custom dev function Stack into N. Virginia with CloudFormation](/images/deploy-to-aws.png)](https://console.aws.amazon.com/cloudformation/home?region=us-east-1#/stacks/new?stackName=gg-dev-pipeline-test&templateURL=)
+**Oregon** (us-west-2) | [![Launch Custom dev function  Stack into Oregon with CloudFormation](/images/deploy-to-aws.png)](https://console.aws.amazon.com/cloudformation/home?region=us-west-2#/stacks/new?stackName=gg-dev-pipeline-test&templateURL=)
+**Frankfurt** (eu-central-1) | [![Launch Custom dev function Stack into Frankfurt with CloudFormation](/images/deploy-to-aws.png)](https://console.aws.amazon.com/cloudformation/home?region=eu-central-1#/stacks/new?stackName=gg-dev-pipeline-test&templateURL=)
+**Sydney** (ap-southeast-2) | [![Launch Custom dev function Stack into Sydney with CloudFormation](/images/deploy-to-aws.png)](https://console.aws.amazon.com/cloudformation/home?region=ap-southeast-2#/stacks/new?stackName=gg-dev-pipeline-test&templateURL=)
+**Tokyo** (ap-northeast-1) | [![Launch Custom dev function Stack into Tokyo with CloudFormation](/images/deploy-to-aws.png)](https://console.aws.amazon.com/cloudformation/home?region=ap-northeast-1#/stacks/new?stackName=gg-dev-pipeline-test&templateURL=)
+
+
+
+
+
+
+
+
 
 
 
@@ -110,3 +119,7 @@ Then it will call SSM and the rpi-build command to be executed on the device.
 The SSM rpi-build command will effectively tell the device to git clone this repo, run npm install.
 
 The scripts/postinstall.sh script will get executed after npm install, effectively packaging up the resulting code, updload it to Lambda, publish an new version, set the alias, and ask GG to redeploy.
+
+# DISCLAIMER
+This is work in progress. Use at your own risk!
+
