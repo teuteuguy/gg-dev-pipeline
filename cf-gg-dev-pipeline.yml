@@ -179,7 +179,7 @@ Resources:
           - Name: GG_GROUP_NAME
             Value: !Ref GGGroupName
           - Name: LAMBDA_FUNCTION_NAME
-            value: !Ref GGDevPipelineFunction
+            Value: !Ref GGDevPipelineFunction
           - Name: SSM_ACTIVATION_ID
             Value: !ImportValue 
               'Fn::Sub': '${CFCommonStackName}-SSMActivationId'
