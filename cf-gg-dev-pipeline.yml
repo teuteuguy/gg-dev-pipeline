@@ -4,15 +4,12 @@ Parameters:
   CFCommonStackName:
     Description: Cloudformation Stack name for the common setup
     Type: String
-    Default: gg-dev-pipeline-common
   GitHubOwner:
     Description: GitHub account username.
     Type: String
-    Default: teuteuguy
   GitHubRepo:
     Description: Just the Github repository name.
     Type: String
-    Default: gg-dev-pipeline
   GitHubBranch:
     Description: The branch that will trigger build/deploy.
     Type: String
@@ -24,7 +21,6 @@ Parameters:
   GGGroupName:
     Description: Greengrass Group Name for this dev pipeline function
     Type: String
-    Default: APACDonkeyCar
 Resources:
   GGDevPipelineSSMDocument:
     Type: 'AWS::SSM::Document'
