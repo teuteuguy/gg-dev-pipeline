@@ -1,23 +1,21 @@
 {
-  "name": "gg-donkey-drive",
+  "name": "gg-dev-pipeline",
   "version": "1.0.0",
-  "description": "Greengrass Lambda function to control the Donkey car servos",
+  "description": "Greengrass Lambda function Dev Pipeline boilerplate",
   "main": "index.js",
   "dependencies": {
-    "i2c-bus": "^2.0.0",
-    "pca9685": "^4.0.3"
   },
   "devDependencies": {},
   "scripts": {
   },
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/teuteuguy/gg-donkey-car.git"
+    "url": "git+https://github.com/teuteuguy/gg-dev-pipeline.git"
   },
   "author": "teuteuguy",
   "license": "MIT",
   "bugs": {
-    "url": "https://github.com/teuteuguy/gg-donkey-car/issues"
+    "url": "https://github.com/teuteuguy/gg-dev-pipeline/issues"
   },
-  "homepage": "https://github.com/teuteuguy/gg-donkey-car#readme"
+  "homepage": "https://github.com/teuteuguy/gg-dev-pipeline#readme"
 }

@@ -42,9 +42,9 @@ Resources:
           ggGroupName:
             type: String
             description: (Required) The GG Group Name
-          devPipelineName:
+          lambdaFunctionName:
             type: String
-            description: Name of the dev pipeline name
+            description: (Required) The Lambda function name
         runtimeConfig:
           'aws:runShellScript':
             properties:
@@ -57,7 +57,7 @@ Resources:
                   - cd /tmp/repo
                   - 'export IOT_CREDENTIAL_ENDPOINT={{ iotCredentialEndpoint }}'
                   - 'export IOT_GG_GROUP_NAME={{ ggGroupName }}'
-                  - 'export DEV_PIPELINE_NAME={{ devPipelineName }}'
+                  - 'export LAMBDA_FUNCTION_NAME={{ lambdaFunctionName }}'
                   - make
   GGDevPipelineFunctionExecutionRole:
     Type: 'AWS::IAM::Role'
@@ -178,6 +178,8 @@ Resources:
             Value: !Ref 'AWS::StackName'
           - Name: GG_GROUP_NAME
             Value: !Ref GGGroupName
+          - Name: LAMBDA_FUNCTION_NAME
+            value: !Ref GGDevPipelineFunction
           - Name: SSM_ACTIVATION_ID
             Value: !ImportValue 
               'Fn::Sub': '${CFCommonStackName}-SSMActivationId'

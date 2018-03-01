@@ -2,27 +2,29 @@
 
 set -e
 
-echo Post Install Script
+echo Deployment
 
-echo DEV_PIPELINE_NAME: $DEV_PIPELINE_NAME
+echo IOT_CREDENTIAL_ENDPOINT: $IOT_CREDENTIAL_ENDPOINT
+echo IOT_GG_GROUP_NAME: $IOT_GG_GROUP_NAME
+echo LAMBDA_FUNCTION_NAME: $LAMBDA_FUNCTION_NAME
 
-# apt-get install -y jq curl zip
+apt-get install -y jq curl zip
 
-# echo Get temporary credentials from AWS IoT:
+echo Get temporary credentials from AWS IoT:
 
-# AWS_COMMAND="aws"
+AWS_COMMAND="aws"
 
-# PRIVATE_KEY=`cat /greengrass/config/config.json | jq -r '.coreThing.keyPath'`
-# CERTIFICATE=`cat /greengrass/config/config.json | jq -r '.coreThing.certPath'`
-# ROOT_CA=`cat /greengrass/config/config.json | jq -r '.coreThing.certPath'`
-# AWS_REGION=`cat /greengrass/config/config.json | jq -r '.coreThing.ggHost | split(".")[2]'`
-# CREDS=`curl -s --key /greengrass/certs/$PRIVATE_KEY --cacert /greengrass/certs/$ROOT_CA --cert /greengrass/certs/$CERTIFICATE https://$IOT_CREDENTIAL_ENDPOINT:443/role-aliases/iot-gg-dev-pipeline-role/credentials`
-# export AWS_ACCESS_KEY_ID=`echo $CREDS | jq -r ".credentials.accessKeyId"`
-# export AWS_SECRET_ACCESS_KEY=`echo $CREDS | jq -r ".credentials.secretAccessKey"`
-# export AWS_SESSION_TOKEN=`echo $CREDS | jq -r ".credentials.sessionToken"`
-# # echo $IOT_CREDENTIAL_ENDPOINT
-# # echo $IOT_GG_GROUP_NAME
-# # echo $AWS_ACCESS_KEY_ID, $AWS_SECRET_ACCESS_KEY, $AWS_SESSION_TOKEN
+PRIVATE_KEY=`cat /greengrass/config/config.json | jq -r '.coreThing.keyPath'`
+CERTIFICATE=`cat /greengrass/config/config.json | jq -r '.coreThing.certPath'`
+ROOT_CA=`cat /greengrass/config/config.json | jq -r '.coreThing.certPath'`
+AWS_REGION=`cat /greengrass/config/config.json | jq -r '.coreThing.ggHost | split(".")[2]'`
+CREDS=`curl -s --key /greengrass/certs/$PRIVATE_KEY --cacert /greengrass/certs/$ROOT_CA --cert /greengrass/certs/$CERTIFICATE https://$IOT_CREDENTIAL_ENDPOINT:443/role-aliases/iot-gg-dev-pipeline-role/credentials`
+export AWS_ACCESS_KEY_ID=`echo $CREDS | jq -r ".credentials.accessKeyId"`
+export AWS_SECRET_ACCESS_KEY=`echo $CREDS | jq -r ".credentials.secretAccessKey"`
+export AWS_SESSION_TOKEN=`echo $CREDS | jq -r ".credentials.sessionToken"`
+# echo $IOT_CREDENTIAL_ENDPOINT
+# echo $IOT_GG_GROUP_NAME
+# echo $AWS_ACCESS_KEY_ID, $AWS_SECRET_ACCESS_KEY, $AWS_SESSION_TOKEN
 
 # LAMBDA_FUNCTION_ARN=`$AWS_COMMAND resourcegroupstaggingapi get-resources --region $AWS_REGION --tag-filters "Key=gg-dev-pipeline,Values=$DEV_PIPELINE_NAME" "Key=type,Values=lambda" --query ResourceTagMappingList[].ResourceARN --output text`
 # echo $LAMBDA_FUNCTION_ARN
@@ -32,9 +34,9 @@ echo DEV_PIPELINE_NAME: $DEV_PIPELINE_NAME
 # echo $LAMBDA_FUNCTION_ARN
 # echo $LAMBDA_FUNCTION_NAME
 
-# echo "Zipping..."
-# rm -f package.zip
-# zip -rq package.zip *
+echo "Zipping..."
+rm -f package.zip
+zip -rq package.zip *
 
 # echo "Uploading to Lambda"
 # $AWS_COMMAND lambda update-function-code --region $AWS_REGION --function-name $LAMBDA_FUNCTION_NAME --zip-file fileb://`pwd`/package.zip
