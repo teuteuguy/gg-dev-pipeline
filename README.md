@@ -20,7 +20,7 @@ Region | Launch Template
 **Tokyo** (ap-northeast-1) | [![Launch Common Stack into Tokyo with CloudFormation](/images/deploy-to-aws.png)](https://console.aws.amazon.com/cloudformation/home?region=ap-northeast-1#/stacks/new?stackName=gg-dev-pipeline-common&templateURL=)
 
 
-### **Manual steps** you need to run after the common template:
+## **Manual steps** you need to run after the common template:
 
 1. Get the ActivationId and ActivationCode from the Outputs of the Common Cloudformation script
 2. Then, on your device (example: Raspberry Pi), install and configure SSM agent.
@@ -39,7 +39,6 @@ Region | Launch Template
 		sudo ./awscli-bundle/install -i /usr/local/aws -b /usr/local/bin/aws
 
 4. Setup and Install Greengrass on your device (with GG Core certificates etc ...)
-5. 
 
 ## Setup the CUSTOM resources for the given dev function you are working on
 
@@ -53,10 +52,7 @@ Region | Launch Template
 **Sydney** (ap-southeast-2) | [![Launch Custom dev function Stack into Sydney with CloudFormation](/images/deploy-to-aws.png)](https://console.aws.amazon.com/cloudformation/home?region=ap-southeast-2#/stacks/new?stackName=gg-dev-pipeline-test&templateURL=)
 **Tokyo** (ap-northeast-1) | [![Launch Custom dev function Stack into Tokyo with CloudFormation](/images/deploy-to-aws.png)](https://console.aws.amazon.com/cloudformation/home?region=ap-northeast-1#/stacks/new?stackName=gg-dev-pipeline-test&templateURL=)
 
-
-
-
-
+## **Manuel steps** you need to add the lambda function to your greengrass group.
 
 
 
