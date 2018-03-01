@@ -4,6 +4,7 @@ This is **Work In Progress** Devops pipeline building for Greengrass Lambda func
 
 ## TODO:
 
+* Fix the missing IoT Role on the Core certificate that references the rolealias with "Effect": "Allow", "Action": "iot:AssumeRoleWithCertificate"
 * Fix the CF script templateURL links in the README to point to final S3 bucket...
 
 ## Start by setting up the COMMON resources.

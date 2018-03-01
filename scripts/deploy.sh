@@ -7,6 +7,7 @@ echo Deployment
 echo IOT_CREDENTIAL_ENDPOINT: $IOT_CREDENTIAL_ENDPOINT
 echo IOT_GG_GROUP_NAME: $IOT_GG_GROUP_NAME
 echo LAMBDA_FUNCTION_NAME: $LAMBDA_FUNCTION_NAME
+echo ROLE_ALIAS: $ROLE_ALIAS
 
 apt-get install -y jq curl zip
 
@@ -18,7 +19,7 @@ PRIVATE_KEY=`cat /greengrass/config/config.json | jq -r '.coreThing.keyPath'`
 CERTIFICATE=`cat /greengrass/config/config.json | jq -r '.coreThing.certPath'`
 ROOT_CA=`cat /greengrass/config/config.json | jq -r '.coreThing.certPath'`
 AWS_REGION=`cat /greengrass/config/config.json | jq -r '.coreThing.ggHost | split(".")[2]'`
-CREDS=`curl -s --key /greengrass/certs/$PRIVATE_KEY --cacert /greengrass/certs/$ROOT_CA --cert /greengrass/certs/$CERTIFICATE https://$IOT_CREDENTIAL_ENDPOINT:443/role-aliases/iot-gg-dev-pipeline-role/credentials`
+CREDS=`curl -s --key /greengrass/certs/$PRIVATE_KEY --cacert /greengrass/certs/$ROOT_CA --cert /greengrass/certs/$CERTIFICATE https://$IOT_CREDENTIAL_ENDPOINT:443/role-aliases/$ROLE_ALIAS/credentials`
 export AWS_ACCESS_KEY_ID=`echo $CREDS | jq -r ".credentials.accessKeyId"`
 export AWS_SECRET_ACCESS_KEY=`echo $CREDS | jq -r ".credentials.secretAccessKey"`
 export AWS_SESSION_TOKEN=`echo $CREDS | jq -r ".credentials.sessionToken"`

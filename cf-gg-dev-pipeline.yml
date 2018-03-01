@@ -1,9 +1,7 @@
 AWSTemplateFormatVersion: 2010-09-09
 Description: Helper CloudFormation to create the dev-pipeline
+
 Parameters:
-  CFCommonStackName:
-    Description: Cloudformation Stack name for the common setup
-    Type: String
   GitHubOwner:
     Description: GitHub account username.
     Type: String
@@ -21,7 +19,326 @@ Parameters:
   GGGroupName:
     Description: Greengrass Group Name for this dev pipeline function
     Type: String
+
 Resources:
+
+  # IAM Role that the Device will assume to re-deploy lambda functions 
+  IoTAuthorizedDirectCallsRole:
+    Type: 'AWS::IAM::Role'
+    Properties:
+      AssumeRolePolicyDocument:
+        Statement:
+          - Sid: ''
+            Effect: Allow
+            Principal:
+              Service:
+                - credentials.iot.amazonaws.com
+            Action: 'sts:AssumeRole'
+      Path: /
+      ManagedPolicyArns:
+        - 'arn:aws:iam::aws:policy/AWSLambdaFullAccess'
+        - 'arn:aws:iam::aws:policy/ResourceGroupsandTagEditorReadOnlyAccess'
+        - 'arn:aws:iam::aws:policy/AWSGreengrassFullAccess'
+  
+  # CUSTOM IAM Role for Creating the IoT Role Alias and Policy
+  CustomResourceIoTRoleAliasExecutionRole:
+    Type: 'AWS::IAM::Role'
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: 2012-10-17
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service:
+                - lambda.amazonaws.com
+                - iot.amazonaws.com
+                - cloudformation.amazonaws.com
+            Action:
+              - 'sts:AssumeRole'
+      Path: /
+      Policies:
+        - PolicyName: root
+          PolicyDocument:
+            Version: 2012-10-17
+            Statement:
+              - Effect: Allow
+                Action:
+                  - 'logs:CreateLogGroup'
+                  - 'logs:CreateLogStream'
+                  - 'logs:PutLogEvents'
+                Resource: 'arn:aws:logs:*:*:*'
+              - Effect: Allow
+                Action:
+                  - 'iot:*'
+                  - 'greengrass:*'
+                  - 'cloudformation:*'
+                  - 'iam:GetRole'
+                  - 'iam:PassRole'
+                Resource: '*'
+  CustomResourceIoTRoleAliasFunction:
+    Type: 'AWS::Lambda::Function'
+    Properties:
+      Handler: index.handler
+      Role: !GetAtt 
+        - CustomResourceIoTRoleAliasExecutionRole
+        - Arn
+      Timeout: '25'
+      Runtime: nodejs6.10
+      Code:
+        ZipFile: >
+          var cfR = require("cfn-response");
+          var AWS = require("aws-sdk");
+          var gg = new AWS.Greengrass();
+          var iot = new AWS.Iot();
+          var cf = new AWS.CloudFormation();
+          var uuidv4 = require("uuid/v4");
+
+          function jsonlog(m, v) { console.log(m, JSON.stringify(v, null, 2)); }
+          function arnSplit(arn, t) { return { i: arn.split("/greengrass/definition/" + t + "/")[1].split("/versions/")[0], v: arn.split("/greengrass/definition/" + t + "/")[1].split("/versions/")[1] };}
+
+          exports.handler = function(e, c, cb) {
+
+              jsonlog("event:", e);
+
+              gg.listGroups().promise().then(function(groups) {
+                  var group = groups.Groups.find(function(g) {
+                      return g.Name === e.ResourceProperties.GroupName;
+                  });
+
+                  if (!group) throw new Error("Group non existant");
+                  else return gg.getGroup({ GroupId: group.Id }).promise();
+              }).then(function(group) {
+                  jsonlog("getGroup:", group);
+
+                  return gg.getGroupVersion({ GroupId: group.Id, GroupVersionId: group.LatestVersion }).promise();
+              }).then(function(groupVersion) {
+
+                  jsonlog('groupVersion:', groupVersion);
+
+                  var coreARN = groupVersion.Definition.CoreDefinitionVersionArn;
+
+                  if (!coreARN) throw new Error('Group has not core ?');
+                  else {
+                      var core = arnSplit(coreARN, 'cores');
+                      return Promise.all([groupVersion, gg.getCoreDefinitionVersion({ CoreDefinitionId: core.i, CoreDefinitionVersionId: core.v }).promise()]);
+                  }
+
+              }).then(function(r) {
+
+                  jsonlog('getCoreVersions:', r);
+                  var groupVersion = r[0];
+                  var coreVersion = r[1];
+                  var CoreCertARN = coreVersion.Definition.Cores[0].CertificateArn;
+
+                  if (e.RequestType === 'Create') {
+                      
+                      // Create Role Alias
+                      var RoleAliasName = uuidv4();
+                      
+                      return Promise.all([RoleAliasName, CoreCertARN, iot.createRoleAlias({
+                          roleAlias: RoleAliasName,
+                          roleArn: e.ResourceProperties.roleArn,
+                          credentialDurationSeconds: 3600
+                      }).promise().then((ra) => {
+                          return iot.createPolicy({
+                              policyDocument: JSON.stringify({ "Version": "2012-10-17", "Statement": [{ "Effect": "Allow", "Action": "iot:AssumeRoleWithCertificate", "Resource": ra.roleAliasArn }]}),
+                              policyName: 'assume-' + ra.roleAlias
+                          }).promise();
+                      }).then((policy) => {
+                          return iot.attachPrincipalPolicy({ policyName: policy.policyName, principal: CoreCertARN }).promise();
+                      })]);
+
+                  } else if (e.RequestType === 'Delete') {
+
+                      return Promise.all([cf.describeStacks({
+                          StackName: e.ResourceProperties.StackName
+                      }).promise().then((stacks) => {
+                          var outputs = stacks.Stacks[0].Outputs;
+                          console.log(outputs);
+                          var RoleAliasName = null;
+                          outputs.forEach(function(output) {
+                              if (output.OutputKey === 'roleAliasName') RoleAliasName = output.OutputValue;
+                          });
+                          if (RoleAliasName && CoreCertARN) {
+                              return Promise.all([
+                                  iot.detachPrincipalPolicy({ policyName: 'assume-' + RoleAliasName, principal: CoreCertARN }).promise().then(function() {
+                                      return iot.deletePolicy({ policyName: 'assume-' + RoleAliasName }).promise()
+                                  }),
+                                  iot.deleteRoleAlias({ roleAlias: RoleAliasName }).promise()
+                              ]);
+                          } else throw new Error(stacks);
+                      })]);
+
+                  } else throw new Error('Not supported yet');
+
+              }).then(function(r) {
+
+                  jsonlog('end:', r);
+                  return cfR.send(e, c, cfR.SUCCESS, {
+                      roleAliasName: r[0]
+                  });
+              }).catch(function(error) {
+                  jsonlog("ERROR:", error);
+                  cfR.send(e, c, cfR.FAILED, error);
+              });
+          };
+  CreateCustomIoTResources:
+    Type: 'Custom::CreateCustomIoTResources'
+    Properties:
+      ServiceToken: !GetAtt 
+        - CustomResourceIoTRoleAliasFunction
+        - Arn
+      roleArn: !GetAtt 
+        - IoTAuthorizedDirectCallsRole
+        - Arn
+      GroupName: !Ref GGGroupName
+      StackName: !Ref 'AWS::StackName'
+
+  # CUSTOM SSM Resource
+  SSMManagedInstancesRole:
+    Type: 'AWS::IAM::Role'
+    Properties:
+      AssumeRolePolicyDocument:
+        Statement:
+          - Sid: ''
+            Effect: Allow
+            Principal:
+              Service:
+                - ssm.amazonaws.com
+            Action: 'sts:AssumeRole'
+      Path: /
+      ManagedPolicyArns:
+        - 'arn:aws:iam::aws:policy/service-role/AmazonEC2RoleforSSM'
+  CustomResourceSSMExecutionRole:
+    Type: 'AWS::IAM::Role'
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: 2012-10-17
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service:
+                - lambda.amazonaws.com
+                - ssm.amazonaws.com
+                - cloudformation.amazonaws.com
+            Action:
+              - 'sts:AssumeRole'
+      Path: /
+      Policies:
+        - PolicyName: root
+          PolicyDocument:
+            Version: 2012-10-17
+            Statement:
+              - Effect: Allow
+                Action:
+                  - 'logs:CreateLogGroup'
+                  - 'logs:CreateLogStream'
+                  - 'logs:PutLogEvents'
+                Resource: 'arn:aws:logs:*:*:*'
+              - Effect: Allow
+                Action:
+                  - 'ssm:*'
+                  - 'cloudformation:*'
+                  - 'iam:GetRole'
+                  - 'iam:PassRole'
+                Resource: '*'
+  CustomResourceSSMFunction:
+    Type: 'AWS::Lambda::Function'
+    Properties:
+      Handler: index.handler
+      Role: !GetAtt 
+        - CustomResourceSSMExecutionRole
+        - Arn
+      Timeout: '25'
+      Runtime: nodejs6.10
+      Code:
+        ZipFile: >
+          var response = require('cfn-response'); var AWS = require('aws-sdk');
+          var cloudformation = new AWS.CloudFormation(); var ssm = new
+          AWS.SSM();
+
+          exports.handler = function(event, context) {
+            console.log("Event:", JSON.stringify(event, null, 2));
+
+            switch(event.RequestType) {
+              case 'Create':                
+                var ssmParams = {
+                  IamRole: event.ResourceProperties.IamRole,
+                  DefaultInstanceName: 'ggDPManagedInstance',
+                  RegistrationLimit: 1,
+                  Description: 'Greengrass Dev Pipeline SSM Activation'
+                };
+                ssm.createActivation(ssmParams, function(err, responseData) {
+                  if (err) {
+                    console.log('ERROR: FAILED TO CREATE SSM ACTIVATION');
+                    console.log(err, err.stack); // an error occurred
+                    response.send(event, context, response.FAILED, responseData);
+                  } else {
+                    console.log('SUCCESS: SSM ACTIVATION CREATED');
+                    console.log(JSON.stringify(responseData, null, 2));
+                    response.send(event, context, response.SUCCESS, responseData);
+                  }
+                });
+                break;
+              case 'Delete':
+                var cfParams = {
+                  StackName: event.ResourceProperties.StackName
+                };
+                cloudformation.describeStacks(cfParams, function(err, data) {
+                  if (err) {
+                    console.log('ERROR: FAILED TO GET CLOUDFORMATION DATA');
+                    console.log(err, err.stack); // an error occurred
+                    response.send(event, context, response.FAILED, data);
+                  } else {
+                    console.log('SUCCESS: CLOUDFORMATION DATA RECEIVED. Getting ouptuts');
+                    console.log(JSON.stringify(data, null, 2));
+                    var outputs = data.Stacks[0].Outputs;
+                    console.log(outputs);
+                    var ActivationId = null;
+                    outputs.forEach(function(output) {
+                      console.log(output.OutputKey, output.OutputValue);
+                      if (output.OutputKey === 'SSMActivationId') ActivationId = output.OutputValue;
+                    });
+                    if (ActivationId) {
+                      console.log('Deleting ActivationId:', ActivationId);
+                      var ssmParams = {
+                        ActivationId: ActivationId
+                      };
+                      ssm.deleteActivation(ssmParams, function(err, responseData) {
+                        if (err) {
+                          console.log('ERROR: FAILED TO DELETE SSM ACTIVATION');
+                          console.log(err, err.stack); // an error occurred
+                          response.send(event, context, response.FAILED, responseData);
+                        } else {
+                          console.log('SUCCESS: SSM ACTIVATION DELETED');
+                          console.log(JSON.stringify(responseData, null, 2));
+                          response.send(event, context, response.SUCCESS, responseData);
+                        }
+                      });
+                    } else {
+                      console.log('ERROR: No activation id found ???');
+                      response.send(event, context, response.FAILED, data);
+                    }
+                  }
+                });
+                break;
+              default:
+                console.error('Not supported');
+                response.send(event, context, response.FAILED, null);
+                break;
+            }
+          };
+  CreateCustomSSMResources:
+    Type: 'Custom::CreateCustomSSMResources'
+    Properties:
+      ServiceToken: !GetAtt 
+        - CustomResourceSSMFunction
+        - Arn
+      IamRole: !Ref SSMManagedInstancesRole
+      StackName: !Ref 'AWS::StackName'
+
+
+  # SSM Document
   GGDevPipelineSSMDocument:
     Type: 'AWS::SSM::Document'
     Properties:
@@ -41,6 +358,9 @@ Resources:
           lambdaFunctionName:
             type: String
             description: (Required) The Lambda function name
+          roleAlias:
+            type: String
+            description: (Required) The IoT Role Alias
         runtimeConfig:
           'aws:runShellScript':
             properties:
@@ -54,7 +374,10 @@ Resources:
                   - 'export IOT_CREDENTIAL_ENDPOINT={{ iotCredentialEndpoint }}'
                   - 'export IOT_GG_GROUP_NAME={{ ggGroupName }}'
                   - 'export LAMBDA_FUNCTION_NAME={{ lambdaFunctionName }}'
+                  - 'export ROLE_ALIAS={{ roleAlias }}'
                   - make
+
+  # The Lambda Function
   GGDevPipelineFunctionExecutionRole:
     Type: 'AWS::IAM::Role'
     Properties:
@@ -102,6 +425,7 @@ Resources:
         - Version
       Name: gg-dev-pipeline
 
+  # Add Lambda to GG
   CustomResourceAddLambdaToGGExecutionRole:
     Type: 'AWS::IAM::Role'
     Properties:
@@ -132,10 +456,17 @@ Resources:
                   - 'greengrass:*'
                   - 'iam:GetRole'
                   - 'iam:PassRole'
+                  - 'iot:AttachPrincipalPolicy'
+                  - 'iot:CreatePolicy'
+                  - 'iot:CreatePolicyVersion'
+                  - 'iot:DeletePolicy'
+                  - 'iot:DeletePolicyVersion'
+                  - 'iot:DescribeRoleAlias'
                   - 'greengrass:ListGroups'
                   - 'greengrass:getGroup'
                   - 'greengrass:getGroupVersion'
                   - 'greengrass:getFunctionDefinitionVersion'
+                  - 'greengrass:getCoreDefinitionVersion'
                   - 'greengrass:createFunctionDefinitionVersion'
                   - 'greengrass:createGroupVersion'
                 Resource: '*'
@@ -154,18 +485,18 @@ Resources:
           var AWS = require('aws-sdk');
           var gg = new AWS.Greengrass();
           const uuidv4 = require('uuid/v4');
-
           function jsonlog(m, v) { console.log(m, JSON.stringify(v, null, 2)); }
+          function arnSplit(arn, t) { return { i: arn.split('/greengrass/definition/'+t+'/')[1].split('/versions/')[0], v: arn.split('/greengrass/definition/'+t+'/')[1].split('/versions/')[1] }; }
 
           exports.handler = (e, c) => {
               jsonlog('EVENT:', e);
-              gg.listGroups().promise().then(function(groups) {
+              gg.listGroups().promise().then(groups => {
                   var group = groups.Groups.find(function(g) {
                       return (g.Name === e.ResourceProperties.GroupName);
                   });
                   if (!group) throw new Error('Group non existant');
                   else return gg.getGroup({GroupId: group.Id}).promise();
-              }).then(function(group) {
+              }).then(group => {
                   jsonlog('getGroup:', group);
                   return gg.getGroupVersion({
                       GroupId: group.Id,
@@ -174,50 +505,46 @@ Resources:
               }).then(function(gV) {
                   jsonlog('getGroupVersion:', gV);
                   var fArn = gV.Definition.FunctionDefinitionVersionArn;
-                  if (!fArn) {
-                      // Current group does not have a function definition yet
-                      console.log('Need to work on this');
-                  } else {
-                      var fId = fArn.split('/greengrass/definition/functions/')[1].split('/versions/')[0];
-                      var fVId = fArn.split('/greengrass/definition/functions/')[1].split('/versions/')[1];
+                  if (!fArn) throw new Error('Group has not funcions ?');
+                  else {
+                      var f = arnSplit(fArn, 'functions');
                       return Promise.all([gV, gg.getFunctionDefinitionVersion({
-                          FunctionDefinitionId: fId,
-                          FunctionDefinitionVersionId: fVId
+                          FunctionDefinitionId: f.i,
+                          FunctionDefinitionVersionId: f.v
                       }).promise()]);
                   }
-              }).then(function(response) {
-                  jsonlog('getFunctionDefinitionVersion:', response);
-                  var gV = response[0];
-                  var functionDefinitionVersion = response[1];
-                  var FunctionDefinitionId = functionDefinitionVersion.Id;
-                  var Functions = functionDefinitionVersion.Definition.Functions;
+              }).then(function(r) {
+                  jsonlog('getXVersions:', r);
+                  var gV = r[0];
+                  var fV = r[1];
+                  var F = fV.Definition.Functions;
                   if (e.RequestType === 'Create') {
-                      Functions.push({
+                      F.push({
                           FunctionArn: e.ResourceProperties.LambdaARN,
                           FunctionConfiguration: {
-                            Environment: {},
-                            MemorySize: 16384,
-                            Pinned: false,
-                            Timeout: 3
+                              Environment: {},
+                              MemorySize: 16384,
+                              Pinned: false,
+                              Timeout: 3
                           },
                           Id: uuidv4()
                       });
                   } else if (e.RequestType === 'Delete') {
-                      Functions = Functions.filter(function(f) {
+                      F = F.filter(function(f) {
                           return (f.FunctionArn !== e.ResourceProperties.LambdaARN);
-                      });            
+                      });
                   }
                   return Promise.all([gV, gg.createFunctionDefinitionVersion({
-                    FunctionDefinitionId: FunctionDefinitionId,
-                    Functions: Functions
+                      FunctionDefinitionId: fV.Id,
+                      Functions: F
                   }).promise()]);
               }).then(function(response) {
                   jsonlog('createFunctionDefinitionVersion:', response);
                   var gV = response[0];
                   var createFunctionDefinitionVersionResponse = response[1];
                   var params = {
-                    GroupId: gV.Id,
-                    FunctionDefinitionVersionArn: createFunctionDefinitionVersionResponse.Arn
+                  GroupId: gV.Id,
+                  FunctionDefinitionVersionArn: createFunctionDefinitionVersionResponse.Arn
                   };
                   if (gV.Definition.CoreDefinitionVersionArn) params.CoreDefinitionVersionArn = gV.Definition.CoreDefinitionVersionArn;
                   if (gV.Definition.DeviceDefinitionVersionArn) params.DeviceDefinitionVersionArn = gV.Definition.DeviceDefinitionVersionArn;
@@ -233,7 +560,6 @@ Resources:
                   cfResponse.send(e, c, cfResponse.FAILED, error);
               });
           };
-
   CreateCustomAddLambdaToGGResources:
     Type: 'Custom::CreateCustomAddLambdaToGGResources'
     Properties:
@@ -243,8 +569,7 @@ Resources:
       GroupName: !Ref GGGroupName
       LambdaARN: !Ref GGDevPipelineFunctionAlias
 
-
-
+  # Code Pipeline
   ArtifactBucket:
     Type: 'AWS::S3::Bucket'
     DeletionPolicy: Retain
@@ -324,9 +649,14 @@ Resources:
             Value: !Ref GGGroupName
           - Name: LAMBDA_FUNCTION_NAME
             Value: !Ref GGDevPipelineFunction
+          - Name: ROLE_ALIAS
+            Value: !GetAtt
+              - CreateCustomIoTResources
+              - roleAliasName
           - Name: SSM_ACTIVATION_ID
-            Value: !ImportValue 
-              'Fn::Sub': '${CFCommonStackName}-SSMActivationId'
+            Value: !GetAtt 
+              - CreateCustomSSMResources
+              - ActivationId
       Name: !Sub '${AWS::StackName}-CodeBuild'
       ServiceRole: !Ref CodeBuildRole
       Source:
@@ -415,3 +745,21 @@ Resources:
         Type: S3
         Location: !Ref ArtifactBucket
 
+Outputs:
+  roleAliasName:
+    Description: The IoT Role Alias that was created
+    Value: !GetAtt
+      - CreateCustomIoTResources
+      - roleAliasName
+  SSMActivationId:
+    Description: SSM Activation ID
+    Value: !GetAtt 
+      - CreateCustomSSMResources
+      - ActivationId
+    Export:
+      Name: !Sub '${AWS::StackName}-SSMActivationId'
+  SSMActivationCode:
+    Description: SSM Activation Code
+    Value: !GetAtt 
+      - CreateCustomSSMResources
+      - ActivationCode
