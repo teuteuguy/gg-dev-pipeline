@@ -142,7 +142,7 @@ Resources:
                       }).promise().then((ra) => {
                           return iot.createPolicy({
                               policyDocument: JSON.stringify({ "Version": "2012-10-17", "Statement": [{ "Effect": "Allow", "Action": "iot:AssumeRoleWithCertificate", "Resource": ra.roleAliasArn }]}),
-                              policyName: 'assume-' + ra.roleAlias
+                              policyName: 'assume-' + RoleAliasName
                           }).promise();
                       }).then((policy) => {
                           return iot.attachPrincipalPolicy({ policyName: policy.policyName, principal: CoreCertARN }).promise();

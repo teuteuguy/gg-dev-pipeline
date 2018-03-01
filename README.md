@@ -4,14 +4,13 @@ This is **Work In Progress** Devops pipeline building for Greengrass Lambda func
 
 ## TODO:
 
-* Fix the missing IoT Role on the Core certificate that references the rolealias with "Effect": "Allow", "Action": "iot:AssumeRoleWithCertificate"
-* Fix the CF script templateURL links in the README to point to final S3 bucket...
+* Add "click to deploy" buttons for the CF script :)
 
-## Start by setting up the COMMON resources.
+## Start by setting up the resources.
 
-Deploy the COMMON Cloudformation template: **cf-common.yml**.
+Deploy the Cloudformation template: **cf-gg-dev-pipeline.yml**.
 
-Give it a name: for example: ***[gg-dev-pipeline-common]***
+Give it a name: for example: ***[gg-dev-pipeline]***
 
 ### Manual steps you need to run after the common template:
 
@@ -32,13 +31,8 @@ Give it a name: for example: ***[gg-dev-pipeline-common]***
 		sudo ./awscli-bundle/install -i /usr/local/aws -b /usr/local/bin/aws
 
 4. Setup and Install Greengrass on your device (with GG Core certificates etc ...)
+5. You are good to go. Push new code to github and your pipeline will trigger
 
-
-## Setup the CUSTOM resources for the given dev function you are working on
-
-Deploy the Custom function Cloudformation template: **cf-gg-dev-pipeline.yml**.
-
-Give it a name: for example: ***[gg-dev-pipeline-wip]***
 
 ## How it works
 
