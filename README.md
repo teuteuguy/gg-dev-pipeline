@@ -6,7 +6,17 @@ This is **Work In Progress** Devops pipeline building for Greengrass Lambda func
 
 * Add "click to deploy" buttons for the CF script :)
 
-## Start by setting up the resources.
+## Clone/Fork this repo.
+
+The repo will be your boylerplate lambda function.
+
+Once you have forked and you have deployed the below (cloudformation) resources, you have to keep the following files for this to work:
+
+* ./buildspec.yml
+* ./Makefile
+* scripts/deploy.sh
+
+## Then setup the resources
 
 Deploy the Cloudformation template: **cf-gg-dev-pipeline.yml**.
 
