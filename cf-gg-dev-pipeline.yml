@@ -397,6 +397,7 @@ Resources:
       ServiceToken: !GetAtt 
         - CustomResourceAddLambdaToGGFunction
         - Arn
+      GroupName: !Ref GGGroupName
       LambdaARN: !Join
         - ':'
         - - !Ref GGDevPipelineFunction
