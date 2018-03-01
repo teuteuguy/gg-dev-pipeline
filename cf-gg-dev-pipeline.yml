@@ -321,63 +321,36 @@ Resources:
           var greengrass = new AWS.Greengrass();
           const uuidv4 = require('uuid/v4');
 
-          // This ARN: arn:aws:lambda:us-west-2:831994023503:function:Test
-
-          function getIdsFromFunctionDefinitionVersionArn(arn) {
-              var FunctionDefinitionId = arn.split('/greengrass/definition/functions/')[1].split('/versions/')[0];
-              var FunctionDefinitionVersionId = arn.split('/greengrass/definition/functions/')[1].split('/versions/')[1];
-
-              return {
-                  FunctionDefinitionId: FunctionDefinitionId,
-                  FunctionDefinitionVersionId: FunctionDefinitionVersionId
-              };
-          }
-
           exports.handler = (event, context, callback) => {
-
               greengrass.listGroups().promise().then(function(groups) {
-                  
                   var group = groups.Groups.find(function(g) {
-                      return (g.Name === 'Ubuntu_VirtualBox');
+                      return (g.Name === event.ResourceProperties.GroupName);
                   });
                   if (!group) throw new Error('Group non existant');
                   else return greengrass.getGroup({GroupId: group.Id}).promise();
-                  
               }).then(function(group) {
-                  
                   return greengrass.getGroupVersion({
                       GroupId: group.Id,
                       GroupVersionId: group.LatestVersion
                   }).promise();
-                  
               }).then(function(groupVersion) {
-
-                  console.log('groupVersion:', JSON.stringify(groupVersion, null, 2));
-                  
                   var FunctionDefinitionVersionArn = groupVersion.Definition.FunctionDefinitionVersionArn;
-                  
                   if (!FunctionDefinitionVersionArn) {
                       // Current group does not have a function definition yet
                       console.log('Need to work on this');
                   } else {
-                      var ids = getIdsFromFunctionDefinitionVersionArn(FunctionDefinitionVersionArn);
-
+                      var FunctionDefinitionId = FunctionDefinitionVersionArn.split('/greengrass/definition/functions/')[1].split('/versions/')[0];
+                      var FunctionDefinitionVersionId = FunctionDefinitionVersionArn.split('/greengrass/definition/functions/')[1].split('/versions/')[1];
                       return Promise.all([groupVersion, greengrass.getFunctionDefinitionVersion({
-                          FunctionDefinitionId: ids.FunctionDefinitionId,
-                          FunctionDefinitionVersionId: ids.FunctionDefinitionVersionId
+                          FunctionDefinitionId: FunctionDefinitionId,
+                          FunctionDefinitionVersionId: FunctionDefinitionVersionId
                       }).promise()]);
                   }
-                  
               }).then(function(response) {
-
                   var groupVersion = response[0];
                   var functionDefinitionVersion = response[1];
-
-                  console.log('functionDefinitionVersion:', JSON.stringify(functionDefinitionVersion, null, 2));
-
                   var FunctionDefinitionId = functionDefinitionVersion.Id;
                   var Functions = functionDefinitionVersion.Definition.Functions;
-
                   if (event.RequestType === 'Create') {
                       Functions.push({
                           FunctionArn: event.ResourceProperties.LambdaARN,
@@ -394,18 +367,13 @@ Resources:
                           return (func.FunctionArn !== event.ResourceProperties.LambdaARN);
                       });            
                   }
-                  
                   return Promise.all([groupVersion, greengrass.createFunctionDefinitionVersion({
                     FunctionDefinitionId: FunctionDefinitionId,
                     Functions: Functions
                   }).promise()]);
-                  
               }).then(function(response) {
                   var groupVersion = response[0];
                   var createFunctionDefinitionVersionResponse = response[1];
-                  
-                  console.log(JSON.stringify(createFunctionDefinitionVersionResponse, null, 2));
-
                   var createGroupVersionParams = {
                     GroupId: groupVersion.Id,
                     FunctionDefinitionVersionArn: createFunctionDefinitionVersionResponse.Arn
@@ -415,14 +383,10 @@ Resources:
                   if (groupVersion.Definition.LoggerDefinitionVersionArn) createGroupVersionParams.LoggerDefinitionVersionArn = groupVersion.Definition.LoggerDefinitionVersionArn;
                   if (groupVersion.Definition.ResourceDefinitionVersionArn) createGroupVersionParams.ResourceDefinitionVersionArn = groupVersion.Definition.ResourceDefinitionVersionArn;
                   if (groupVersion.Definition.SubscriptionDefinitionVersionArn) createGroupVersionParams.SubscriptionDefinitionVersionArn = groupVersion.Definition.SubscriptionDefinitionVersionArn;
-
                   return greengrass.createGroupVersion(createGroupVersionParams).promise();
-                  
               }).then(function(response) {
-                  console.log('Done:', JSON.stringify(response, null, 2));
                   callback(null, 'SUCCESS'); 
               }).catch(function(error) {
-                  console.error(error);
                   callback(null, 'ERROR'); 
               });
           };
@@ -433,6 +397,7 @@ Resources:
       ServiceToken: !GetAtt 
         - CustomResourceAddLambdaToGGFunction
         - Arn
-      LambdaARN: !GetAtt
-        - Alias
-        - Arn
+      LambdaARN: !Join
+        - ':'
+        - - !Ref GGDevPipelineFunction
+          - !Ref Alias
