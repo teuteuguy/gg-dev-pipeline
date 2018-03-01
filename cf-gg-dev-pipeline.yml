@@ -97,7 +97,7 @@ Resources:
     Properties:
       FunctionName: !Ref GGDevPipelineFunction
       Description: This is the first published version of my function
-  Alias:
+  GGDevPipelineFunctionAlias:
     Type: 'AWS::Lambda::Alias'
     Properties:
       FunctionName: !Ref GGDevPipelineFunction
@@ -105,6 +105,150 @@ Resources:
         - GGDevPipelineFunctionFirstVersion
         - Version
       Name: gg-dev-pipeline
+
+  CustomResourceAddLambdaToGGExecutionRole:
+    Type: 'AWS::IAM::Role'
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: 2012-10-17
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service:
+                - lambda.amazonaws.com
+                - greengrass.amazonaws.com
+            Action:
+              - 'sts:AssumeRole'
+      Path: /
+      Policies:
+        - PolicyName: root
+          PolicyDocument:
+            Version: 2012-10-17
+            Statement:
+              - Effect: Allow
+                Action:
+                  - 'logs:CreateLogGroup'
+                  - 'logs:CreateLogStream'
+                  - 'logs:PutLogEvents'
+                Resource: 'arn:aws:logs:*:*:*'
+              - Effect: Allow
+                Action:
+                  - 'greengrass:*'
+                  - 'iam:GetRole'
+                  - 'iam:PassRole'
+                  - 'greengrass:ListGroups'
+                  - 'greengrass:getGroup'
+                  - 'greengrass:getGroupVersion'
+                  - 'greengrass:getFunctionDefinitionVersion'
+                  - 'greengrass:createFunctionDefinitionVersion'
+                  - 'greengrass:createGroupVersion'
+                Resource: '*'
+  CustomResourceAddLambdaToGGFunction:
+    Type: 'AWS::Lambda::Function'
+    Properties:
+      Handler: index.handler
+      Role: !GetAtt 
+        - CustomResourceAddLambdaToGGExecutionRole
+        - Arn
+      Timeout: '30'
+      Runtime: nodejs6.10
+      Code:
+        ZipFile: >
+          var cfResponse = require('cfn-response');
+          var AWS = require('aws-sdk');
+          var gg = new AWS.Greengrass();
+          const uuidv4 = require('uuid/v4');
+
+          function jsonlog(m, v) { console.log(m, JSON.stringify(v, null, 2)); }
+
+          exports.handler = (e, c) => {
+              jsonlog('EVENT:', e);
+              gg.listGroups().promise().then(function(groups) {
+                  var group = groups.Groups.find(function(g) {
+                      return (g.Name === e.ResourceProperties.GroupName);
+                  });
+                  if (!group) throw new Error('Group non existant');
+                  else return gg.getGroup({GroupId: group.Id}).promise();
+              }).then(function(group) {
+                  jsonlog('getGroup:', group);
+                  return gg.getGroupVersion({
+                      GroupId: group.Id,
+                      GroupVersionId: group.LatestVersion
+                  }).promise();
+              }).then(function(gV) {
+                  jsonlog('getGroupVersion:', gV);
+                  var fArn = gV.Definition.FunctionDefinitionVersionArn;
+                  if (!fArn) {
+                      // Current group does not have a function definition yet
+                      console.log('Need to work on this');
+                  } else {
+                      var fId = fArn.split('/greengrass/definition/functions/')[1].split('/versions/')[0];
+                      var fVId = fArn.split('/greengrass/definition/functions/')[1].split('/versions/')[1];
+                      return Promise.all([gV, gg.getFunctionDefinitionVersion({
+                          FunctionDefinitionId: fId,
+                          FunctionDefinitionVersionId: fVId
+                      }).promise()]);
+                  }
+              }).then(function(response) {
+                  jsonlog('getFunctionDefinitionVersion:', response);
+                  var gV = response[0];
+                  var functionDefinitionVersion = response[1];
+                  var FunctionDefinitionId = functionDefinitionVersion.Id;
+                  var Functions = functionDefinitionVersion.Definition.Functions;
+                  if (e.RequestType === 'Create') {
+                      Functions.push({
+                          FunctionArn: e.ResourceProperties.LambdaARN,
+                          FunctionConfiguration: {
+                            Environment: {},
+                            MemorySize: 16384,
+                            Pinned: false,
+                            Timeout: 3
+                          },
+                          Id: uuidv4()
+                      });
+                  } else if (e.RequestType === 'Delete') {
+                      Functions = Functions.filter(function(f) {
+                          return (f.FunctionArn !== e.ResourceProperties.LambdaARN);
+                      });            
+                  }
+                  return Promise.all([gV, gg.createFunctionDefinitionVersion({
+                    FunctionDefinitionId: FunctionDefinitionId,
+                    Functions: Functions
+                  }).promise()]);
+              }).then(function(response) {
+                  jsonlog('createFunctionDefinitionVersion:', response);
+                  var gV = response[0];
+                  var createFunctionDefinitionVersionResponse = response[1];
+                  var params = {
+                    GroupId: gV.Id,
+                    FunctionDefinitionVersionArn: createFunctionDefinitionVersionResponse.Arn
+                  };
+                  if (gV.Definition.CoreDefinitionVersionArn) params.CoreDefinitionVersionArn = gV.Definition.CoreDefinitionVersionArn;
+                  if (gV.Definition.DeviceDefinitionVersionArn) params.DeviceDefinitionVersionArn = gV.Definition.DeviceDefinitionVersionArn;
+                  if (gV.Definition.LoggerDefinitionVersionArn) params.LoggerDefinitionVersionArn = gV.Definition.LoggerDefinitionVersionArn;
+                  if (gV.Definition.ResourceDefinitionVersionArn) params.ResourceDefinitionVersionArn = gV.Definition.ResourceDefinitionVersionArn;
+                  if (gV.Definition.SubscriptionDefinitionVersionArn) params.SubscriptionDefinitionVersionArn = gV.Definition.SubscriptionDefinitionVersionArn;
+                  return gg.createGroupVersion(params).promise();
+              }).then(function(response) {
+                  jsonlog('createGroupVersion:', response);
+                  return cfResponse.send(e, c, cfResponse.SUCCESS, response);
+              }).catch(function(error) {
+                  jsonlog('ERROR:', error);
+                  cfResponse.send(e, c, cfResponse.FAILED, error);
+              });
+          };
+
+  CreateCustomAddLambdaToGGResources:
+    Type: 'Custom::CreateCustomAddLambdaToGGResources'
+    Properties:
+      ServiceToken: !GetAtt 
+        - CustomResourceAddLambdaToGGFunction
+        - Arn
+      GroupName: !Ref GGGroupName
+      LambdaARN: !Ref GGDevPipelineFunctionAlias
+
+
+
   ArtifactBucket:
     Type: 'AWS::S3::Bucket'
     DeletionPolicy: Retain
@@ -275,130 +419,3 @@ Resources:
         Type: S3
         Location: !Ref ArtifactBucket
 
-  CustomResourceAddLambdaToGGExecutionRole:
-    Type: 'AWS::IAM::Role'
-    Properties:
-      AssumeRolePolicyDocument:
-        Version: 2012-10-17
-        Statement:
-          - Effect: Allow
-            Principal:
-              Service:
-                - lambda.amazonaws.com
-                - greengrass.amazonaws.com
-            Action:
-              - 'sts:AssumeRole'
-      Path: /
-      Policies:
-        - PolicyName: root
-          PolicyDocument:
-            Version: 2012-10-17
-            Statement:
-              - Effect: Allow
-                Action:
-                  - 'logs:CreateLogGroup'
-                  - 'logs:CreateLogStream'
-                  - 'logs:PutLogEvents'
-                Resource: 'arn:aws:logs:*:*:*'
-              - Effect: Allow
-                Action:
-                  - 'greengrass:*'
-                  - 'iam:GetRole'
-                  - 'iam:PassRole'
-                Resource: '*'
-  CustomResourceAddLambdaToGGFunction:
-    Type: 'AWS::Lambda::Function'
-    Properties:
-      Handler: index.handler
-      Role: !GetAtt 
-        - CustomResourceAddLambdaToGGExecutionRole
-        - Arn
-      Timeout: '30'
-      Runtime: nodejs6.10
-      Code:
-        ZipFile: >
-          var AWS = require('aws-sdk');
-          var greengrass = new AWS.Greengrass();
-          const uuidv4 = require('uuid/v4');
-
-          exports.handler = (event, context, callback) => {
-              greengrass.listGroups().promise().then(function(groups) {
-                  var group = groups.Groups.find(function(g) {
-                      return (g.Name === event.ResourceProperties.GroupName);
-                  });
-                  if (!group) throw new Error('Group non existant');
-                  else return greengrass.getGroup({GroupId: group.Id}).promise();
-              }).then(function(group) {
-                  return greengrass.getGroupVersion({
-                      GroupId: group.Id,
-                      GroupVersionId: group.LatestVersion
-                  }).promise();
-              }).then(function(groupVersion) {
-                  var FunctionDefinitionVersionArn = groupVersion.Definition.FunctionDefinitionVersionArn;
-                  if (!FunctionDefinitionVersionArn) {
-                      // Current group does not have a function definition yet
-                      console.log('Need to work on this');
-                  } else {
-                      var FunctionDefinitionId = FunctionDefinitionVersionArn.split('/greengrass/definition/functions/')[1].split('/versions/')[0];
-                      var FunctionDefinitionVersionId = FunctionDefinitionVersionArn.split('/greengrass/definition/functions/')[1].split('/versions/')[1];
-                      return Promise.all([groupVersion, greengrass.getFunctionDefinitionVersion({
-                          FunctionDefinitionId: FunctionDefinitionId,
-                          FunctionDefinitionVersionId: FunctionDefinitionVersionId
-                      }).promise()]);
-                  }
-              }).then(function(response) {
-                  var groupVersion = response[0];
-                  var functionDefinitionVersion = response[1];
-                  var FunctionDefinitionId = functionDefinitionVersion.Id;
-                  var Functions = functionDefinitionVersion.Definition.Functions;
-                  if (event.RequestType === 'Create') {
-                      Functions.push({
-                          FunctionArn: event.ResourceProperties.LambdaARN,
-                          FunctionConfiguration: {
-                            Environment: {},
-                            MemorySize: 16384,
-                            Pinned: false,
-                            Timeout: 3
-                          },
-                          Id: uuidv4()
-                      });
-                  } else if (event.RequestType === 'Delete') {
-                      Functions = Functions.filter(function(func) {
-                          return (func.FunctionArn !== event.ResourceProperties.LambdaARN);
-                      });            
-                  }
-                  return Promise.all([groupVersion, greengrass.createFunctionDefinitionVersion({
-                    FunctionDefinitionId: FunctionDefinitionId,
-                    Functions: Functions
-                  }).promise()]);
-              }).then(function(response) {
-                  var groupVersion = response[0];
-                  var createFunctionDefinitionVersionResponse = response[1];
-                  var createGroupVersionParams = {
-                    GroupId: groupVersion.Id,
-                    FunctionDefinitionVersionArn: createFunctionDefinitionVersionResponse.Arn
-                  };
-                  if (groupVersion.Definition.CoreDefinitionVersionArn) createGroupVersionParams.CoreDefinitionVersionArn = groupVersion.Definition.CoreDefinitionVersionArn;
-                  if (groupVersion.Definition.DeviceDefinitionVersionArn) createGroupVersionParams.DeviceDefinitionVersionArn = groupVersion.Definition.DeviceDefinitionVersionArn;
-                  if (groupVersion.Definition.LoggerDefinitionVersionArn) createGroupVersionParams.LoggerDefinitionVersionArn = groupVersion.Definition.LoggerDefinitionVersionArn;
-                  if (groupVersion.Definition.ResourceDefinitionVersionArn) createGroupVersionParams.ResourceDefinitionVersionArn = groupVersion.Definition.ResourceDefinitionVersionArn;
-                  if (groupVersion.Definition.SubscriptionDefinitionVersionArn) createGroupVersionParams.SubscriptionDefinitionVersionArn = groupVersion.Definition.SubscriptionDefinitionVersionArn;
-                  return greengrass.createGroupVersion(createGroupVersionParams).promise();
-              }).then(function(response) {
-                  callback(null, 'SUCCESS'); 
-              }).catch(function(error) {
-                  callback(null, 'ERROR'); 
-              });
-          };
-
-  CreateCustomAddLambdaToGGResources:
-    Type: 'Custom::CreateCustomAddLambdaToGGResources'
-    Properties:
-      ServiceToken: !GetAtt 
-        - CustomResourceAddLambdaToGGFunction
-        - Arn
-      GroupName: !Ref GGGroupName
-      LambdaARN: !Join
-        - ':'
-        - - !Ref GGDevPipelineFunction
-          - !Ref Alias
